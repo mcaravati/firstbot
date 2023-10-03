@@ -7,11 +7,59 @@
 </head>
 <body>
     <script>
+        let key_down = false;
+
+        const packet_types = {
+            LEFT: 'left',
+            RIGHT: 'right',
+            FORWARD: 'forward',
+            BACKWARD: 'backward',
+            STOP: 'stop'
+        }
+
+        function keypress_handler(socket, event) {
+            if (key_down) {
+                return;
+            }
+
+            let packet_type = null;
+
+            switch(event.key) {
+                case "w":
+                    packet_type = packet_types.FORWARD;
+                    break;
+                case "a":
+                    packet_type = packet_types.LEFT;
+                    break;
+                case "d":
+                    packet_type = packet_types.RIGHT;
+                    break;
+                case "s":
+                    packet_type = packet_types.BACKWARD;
+                    break;
+                default:
+                    return;
+            }
+
+            key_down = true;
+
+            socket.send(JSON.stringify({
+                type: packet_type
+            }));
+        }
+
+        function keyup_handler(socket, event) {
+            key_down = false;
+            
+            socket.send(JSON.stringify({
+                type: packet_types.STOP
+            }));
+        }
+
         const socket = new WebSocket("ws://localhost:8080")
         socket.addEventListener("open", (event) => {
-            socket.send(JSON.stringify({
-                type: "stop"
-            }));
+            document.addEventListener('keypress', event => keypress_handler(socket, event));
+            document.addEventListener('keyup', event => keyup_handler(socket, event));
         });
 
         // Listen for messages
