@@ -1,4 +1,5 @@
 from abstract_control import AbstractControl
+import pypot.dynamixel
 
 class NormalControl(AbstractControl):
     def __init__(self, **kwargs):
