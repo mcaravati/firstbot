@@ -1,5 +1,7 @@
 from abstract_control import AbstractControl
 import pypot.dynamixel
+from utils import *
+from math import *
 
 class NormalControl(AbstractControl):
     def __init__(self, **kwargs):
@@ -38,3 +40,16 @@ class NormalControl(AbstractControl):
         self.dxl_io.set_moving_speed({5: 0})
         self.dxl_io.disable_torque([2, 5])
         print("[+] Dummy control stop")
+
+    def compute_odometry(self):
+        # Récupérer les données odométriques
+        dt = 0.01
+
+        left = left_wheel_speed()
+        right = right_wheel_speed()
+
+        v, theta = direct_kinematics(left, right)
+        self._x += v * dt * math.cos(theta)
+        self._y += v * dt * math.sin(theta)
+
+        return (self._x, self._y, theta)

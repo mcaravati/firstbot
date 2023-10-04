@@ -1,10 +1,7 @@
 from abstract_server import AbtractServer
-from websockets import serve
+from websockets import serve, broadcast
 import asyncio
 import json
-import pypot.dynamixel
-from utils import *
-from math import *
 
 class WebSocketServer(AbtractServer):
     def __init__(self, **kwargs):
@@ -16,41 +13,16 @@ class WebSocketServer(AbtractServer):
             'backward': self._backward,
             'left': self._left,
             'right': self._right,
-            'stop': self._stop
+            'stop': self._stop,
+            'odometry': self._send_odometry
         }
 
     async def _server_wrapper(self):
         async with serve(self._message_handler, "0.0.0.0", 8080):
             await asyncio.Future()
-    
-    async def send_odometry(self, websocket, path):
-        x = 0
-        y = 0
-        while True:
-            # Récupérer les données odométriques
-            dt = 0.01
-            left = left_wheel_speed()
-            right = right_wheel_speed()
-            v, theta = direct_kinematics(left, right)
-            x += v * dt * math.cos(theta)
-            y += v * dt * math.sin(theta)
-            
-            # Construire et envoyer le message
-            response = {
-                'status': 'odometry',
-                'odometry': {
-                    'x': x,
-                    'y': y,
-                    'theta': theta
-                }
-            }
-            await websocket.send(json.dumps(response))
-            await asyncio.sleep(0.01)  # Attendre 0,01 secondes
         
-
     def start(self):
         asyncio.get_event_loop().run_until_complete(self._server_wrapper())
-        asyncio.get_event_loop().run_until_complete(self.send_odometry())
 
     def stop(self):
         self._websocket_server.shutdown()
@@ -60,19 +32,34 @@ class WebSocketServer(AbtractServer):
             json_data = json.loads(message)
 
             if json_data['type'] in self._function_map:
-                self._function_map[json_data['type']]()
+                await self._function_map[json_data['type']](websocket)
 
-    def _forward(self):
+    async def _forward(self, _):
         return self._robot_control.forward()
 
-    def _backward(self):
+    async def _backward(self, _):
         return self._robot_control.backward()
 
-    def _left(self):
+    async def _left(self, _):
         return self._robot_control.left()
 
-    def _right(self):
+    async def _right(self, _):
         return self._robot_control.right()
 
-    def _stop(self):
+    async def _stop(self, _):
         return self._robot_control.stop()
+
+    async def _send_odometry(self, websocket):
+        x, y, theta = self._robot_control.compute_odometry()
+        
+        # Construire et envoyer le message
+        response = {
+            'type': 'odometry',
+            'data': {
+                'x': x,
+                'y': y,
+                'theta': theta
+            }
+        }
+
+        await websocket.send(json.dumps(response))

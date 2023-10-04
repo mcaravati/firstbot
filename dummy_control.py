@@ -1,4 +1,5 @@
 from abstract_control import AbstractControl
+from random import randint
 
 class DummyControl(AbstractControl):
     def __init__(self, **kwargs):
@@ -19,3 +20,13 @@ class DummyControl(AbstractControl):
 
     def stop(self):
         print("[+] Dummy control stop")
+
+    def compute_odometry(self):
+        print("[+] Dummy control odometry")
+
+        x = randint(0, 699)
+        y = randint(0, 699)
+        theta = randint(0, 360)
+
+        return (x, y, theta)
+

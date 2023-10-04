@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
 
 class AbstractControl(ABC):
+    def __init__(self):
+        self._x = 0
+        self._y = 0
+
     @abstractmethod
     def forward(self):
         pass
@@ -19,5 +23,9 @@ class AbstractControl(ABC):
 
     @abstractmethod
     def stop(self):
+        pass
+
+    @abstractmethod
+    def compute_odometry(self):
         pass
 
