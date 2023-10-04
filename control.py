@@ -13,6 +13,9 @@ class NormalControl(AbstractControl):
 
         self.dxl_io = pypot.dynamixel.DxlIO(ports[0])
         self.dxl_io.set_wheel_mode([2, 5])
+        self._x = 0
+        self._y = 0
+        self._theta = 0
         print("[+] Control initialized")
         
     def forward(self):
@@ -49,7 +52,10 @@ class NormalControl(AbstractControl):
         right = right_wheel_speed()
 
         v, theta = direct_kinematics(left, right)
-        self._x += v * dt * math.cos(theta)
-        self._y += v * dt * math.sin(theta)
+        self._theta += theta
+        self._x += v * dt * math.cos(self._theta)
+        self._y += v * dt * math.sin(self._theta)
+
+        print(f"X: {self._x:<10} Y: {self._y:<10} Theta: {self._theta:<10}", end='\r')
 
         return (self._x, self._y, theta)
