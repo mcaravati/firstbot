@@ -8,14 +8,73 @@
 </head>
 
 <body>
+    <div id="onboard">
+        <div class="scale-wrapper">
+            <span>11m</span>
+            <div class="scale-outer">
+                <div class="scale-inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <input type="number" id="x" />
+        <input type="number" id="y" />
+        <input type="number" id="theta" />
+        <button onclick="on_goto_click()">Goto</button>
+        <button onclick="reset_odometry()">Reset odometry</button>
+        <input type="range" min="0" max="4" value="1" class="slider" id="speed">
+    </div>
+
     <style>
         #map {
-            border: 1px red solid;
+            border: 1px black solid;
+        }
+
+        html {
+            height: 100vh;
+        }
+
+        body {
+            padding: 1%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly;
+            height: 100%;
+            margin: 0;
+            box-sizing: border-box;
+        }
+
+        .scale-wrapper {
+            display: flex;
+            align-items: center;
+            margin-right: 1em;
+        }
+
+        .scale-outer {
+            border-top: 3px solid black;
+            border-bottom: 3px solid black;
+            width: 11px;
+            height: 700px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .scale-inner {
+            background-color: black;
+            height: 100%;
+            width: 3px;
+        }
+
+        #onboard {
+            width: 100%;
+            display: flex;
         }
     </style>
 
     <script>
         const canvas_size = 700;
+        const pixel_size = 5;
 
         let context = null;
         let key_down = false;
@@ -26,8 +85,11 @@
             FORWARD: 'forward',
             BACKWARD: 'backward',
             STOP: 'stop',
-            ODOMETRY: 'odometry'
-        }
+            ODOMETRY: 'odometry',
+            GOTO: 'goto',
+            RESET_ODOMETRY: 'reset_odometry',
+            SET_SPEED: 'set_speed'
+        };
 
         const colors = {
             RED: { red: 255, green: 0, blue: 0 },
@@ -37,7 +99,7 @@
 
         function set_pixel(x, y, { red, green, blue }) {
             context.fillStyle = `rgba(${red},${green},${blue}, 1)`;
-            context.fillRect(x, y, 5, 5);
+            context.fillRect(x, y, pixel_size, pixel_size);
         }
 
         function keypress_handler(socket, event) {
@@ -79,35 +141,116 @@
             }));
         }
 
+        function point_to_centered(x, y) {
+            return {
+                centered_x: x + canvas_size / 2,
+                centered_y: y + canvas_size / 2
+            };
+        }
+
         function handle_odometry_packet(message) {
-
-            function point_to_centered(x, y) {
-                return {
-                    centered_x: x + canvas_size / 2,
-                    centered_y: y + canvas_size / 2
-                };
-            }
-
             const { x, y, theta } = message.data;
-            const { centered_x, centered_y } = point_to_centered(x, y);
+            const { centered_x, centered_y } = point_to_centered(x * 100, y * 100);
 
             set_pixel(centered_x, centered_y, colors.RED);
         }
 
-        const socket = new WebSocket("ws://localhost:8080")
+
+        function init_canvas() {
+            // Style axis
+            context.beginPath();
+            context.moveTo(0, canvas_size / 2); // Start point
+            context.lineTo(canvas_size, canvas_size / 2); // End point
+
+            context.moveTo(canvas_size / 2, 0); // Start point
+            context.lineTo(canvas_size / 2, canvas_size); // End point
+
+            // Style scale
+            for (let step = canvas_size / 2; step >= 0; step -= Math.floor(canvas_size / 11)) {
+                context.moveTo(step, (canvas_size / 2) - 10);
+                context.lineTo(step, (canvas_size / 2) + 10);
+
+                context.moveTo((canvas_size / 2) - 10, step);
+                context.lineTo((canvas_size / 2) + 10, step);
+            }
+
+            for (let step = canvas_size / 2; step < canvas_size; step += Math.floor(canvas_size / 11)) {
+                context.moveTo(step, (canvas_size / 2) - 10);
+                context.lineTo(step, (canvas_size / 2) + 10);
+
+                context.moveTo((canvas_size / 2) - 10, step);
+                context.lineTo((canvas_size / 2) + 10, step);
+            }
+
+            context.stroke();
+        }
+
+        const socket = new WebSocket("ws://192.168.208.223:8080")
         socket.addEventListener("open", (event) => {
+            // Create canvas
             const canvas = document.createElement("canvas");
             canvas.width = canvas_size;
             canvas.height = canvas_size;
             canvas.id = "map";
 
             context = canvas.getContext("2d");
-            document.body.appendChild(canvas);
+            document.getElementById("onboard").appendChild(canvas);
+
+            init_canvas();
+
+            // Setup speed slider
+            const slider = document.getElementById("speed");
+            slider.addEventListener("change", (event) => {
+                socket.send(JSON.stringify({
+                    type: packet_types.SET_SPEED,
+                    data: {
+                        speed: slider.value
+                    }
+                }));
+            });
+
+            setInterval(() => {
+                socket.send(JSON.stringify({
+                    type: packet_types.ODOMETRY
+                }));
+            }, 100);
 
             document.addEventListener('keypress', event => keypress_handler(socket, event));
             document.addEventListener('keyup', event => keyup_handler(socket, event));
         });
 
+        function on_goto_click() {
+            const x_element = document.getElementById("x");
+            const x = parseInt(x_element.value);
+
+            const y_element = document.getElementById("y");
+            const y = parseInt(y_element.value);
+
+            const theta_element = document.getElementById("theta");
+            const theta = parseInt(theta_element.value);
+
+            socket.send(JSON.stringify({
+                type: packet_types.GOTO,
+                data: {
+                    x,
+                    y,
+                    theta
+                }
+            }));
+
+            // Rotate point
+            const {centered_x, centered_y} = point_to_centered(x, y);
+            set_pixel(centered_x, centered_y, colors.GREEN);
+        }
+
+        function reset_odometry() {
+            socket.send(JSON.stringify({
+                type: packet_types.RESET_ODOMETRY,
+            }));
+
+            context.clearRect(0, 0, canvas_size, canvas_size);
+            init_canvas();
+        }
 
         // Listen for messages
         socket.addEventListener("message", (event) => {
