@@ -94,7 +94,7 @@
             set_pixel(centered_x, centered_y, colors.RED);
         }
 
-        const socket = new WebSocket("ws://localhost:8080")
+        const socket = new WebSocket("ws://192.168.43.157:8080")
         socket.addEventListener("open", (event) => {
             const canvas = document.createElement("canvas");
             canvas.width = canvas_size;
@@ -103,6 +103,12 @@
 
             context = canvas.getContext("2d");
             document.body.appendChild(canvas);
+
+            setInterval(()=> {
+                socket.send(JSON.stringify({
+                type: packet_types.ODOMETRY
+            }));
+            }, 100);
 
             document.addEventListener('keypress', event => keypress_handler(socket, event));
             document.addEventListener('keyup', event => keyup_handler(socket, event));
