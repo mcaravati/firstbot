@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
 </head>
+
 <body>
     <style>
         #map {
@@ -28,12 +30,12 @@
         }
 
         const colors = {
-            RED: {red: 255, green: 0, blue: 0},
-            GREEN: {red: 0, green: 255, blue: 0},
-            BLUE: {red: 0, green: 0, blue: 255},
+            RED: { red: 255, green: 0, blue: 0 },
+            GREEN: { red: 0, green: 255, blue: 0 },
+            BLUE: { red: 0, green: 0, blue: 255 },
         }
 
-        function set_pixel(x, y, {red, green, blue}) {
+        function set_pixel(x, y, { red, green, blue }) {
             context.fillStyle = `rgba(${red},${green},${blue}, 1)`;
             context.fillRect(x, y, 5, 5);
         }
@@ -45,7 +47,7 @@
 
             let packet_type = null;
 
-            switch(event.key) {
+            switch (event.key) {
                 case "w":
                     packet_type = packet_types.FORWARD;
                     break;
@@ -77,18 +79,27 @@
             }));
         }
 
+        function handle_odometry_packet(message) {
+
+            function point_to_centered(x, y) {
+                return {
+                    centered_x: x + canvas_size / 2,
+                    centered_y: y + canvas_size / 2
+                };
+            }
+
+            const { x, y, theta } = message.data;
+            const { centered_x, centered_y } = point_to_centered(x, y);
+
+            set_pixel(centered_x, centered_y, colors.RED);
+        }
+
         const socket = new WebSocket("ws://localhost:8080")
         socket.addEventListener("open", (event) => {
             const canvas = document.createElement("canvas");
             canvas.width = canvas_size;
             canvas.height = canvas_size;
             canvas.id = "map";
-
-            setInterval(() => {
-                socket.send(JSON.stringify({
-                    type: packet_types.ODOMETRY
-                }));
-            }, 1000);
 
             context = canvas.getContext("2d");
             document.body.appendChild(canvas);
@@ -97,18 +108,11 @@
             document.addEventListener('keyup', event => keyup_handler(socket, event));
         });
 
-        function handle_odometry_packet(message) {
-            const {x, y, theta} = message.data;
-            set_pixel(x, y, colors.RED);
-            console.log("odometry received")
-        }
 
         // Listen for messages
         socket.addEventListener("message", (event) => {
             const message = JSON.parse(event.data);
 
-            console.log(message)
-            
             switch (message.type) {
                 case packet_types.ODOMETRY:
                     handle_odometry_packet(message);
@@ -119,4 +123,5 @@
         });
     </script>
 </body>
+
 </html>
