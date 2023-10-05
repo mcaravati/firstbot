@@ -26,7 +26,7 @@ colors["green"] = [np.array([30, 50, 20]), np.array([65, 255, 255])]
 colors["orange"] = [np.array([0, 20, 10]), np.array([20, 255, 255])]
 
 #Witch color to detect
-detect = ["black", "green"]
+detect = ["green", "black"]
 old_calc = 0
 #Set swap color
 limit = "orange"
@@ -59,8 +59,8 @@ def compute(img):
     #transform HSV
     hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     #set color range
-    lower_range = colors[detect[1]][0]
-    upper_range = colors[detect[1]][1]
+    lower_range = colors["green"][0]
+    upper_range = colors["green"][1]
     #masking
     mask = cv2.inRange(hsv_img, lower_range, upper_range)
     #generate mask's skeleton
@@ -155,9 +155,10 @@ def compute_black(img):
 
 #swap line detection
 def swap(img, curr_col):
+    global go, stamp
     t = time()
     #check if swap can be operated
-    if stamp[1] or (t - stamp[0] >= 5):
+    if stamp[1] or (t - stamp[0] >= 5.0):
         stamp[1] = True
         #dropping the top of the image
         img[:, 40:] = 0
@@ -171,10 +172,12 @@ def swap(img, curr_col):
         #detect real mark or artefact
         Y,X = np.where(mask != 0)
         if len(Y) > 1500:
-            curr_col = (curr_col + 1) % 2 #change color
+            curr_col -= 1 #change color
             #curr_col = 1 #change color
             stamp[1] = False #lock swap
             stamp[0] = t #remember last timestamp swap occured
+            if curr_col == -1:
+                go = False
     return curr_col
 
 
@@ -182,7 +185,7 @@ if __name__ == "__main__":
     curr_col = 0
     while go:
         image = capture()
-        percent = compute_black(image) if curr_col == 0 else compute(image)
+        percent = compute_black(image) if curr_col == 1 else compute(image)
         print(percent, detect[curr_col], f"old : {old_calc}")
         old_calc = percent
         swap(image)
