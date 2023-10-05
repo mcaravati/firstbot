@@ -23,6 +23,8 @@
         <input type="number" id="theta" />
         <button onclick="on_goto_click()">Goto</button>
         <button onclick="reset_odometry()">Reset odometry</button>
+        <button onclick="track_line_mode()">Track line</button>
+
         <input type="range" min="0" max="4" value="1" class="slider" id="speed">
     </div>
 
@@ -88,7 +90,8 @@
             ODOMETRY: 'odometry',
             GOTO: 'goto',
             RESET_ODOMETRY: 'reset_odometry',
-            SET_SPEED: 'set_speed'
+            SET_SPEED: 'set_speed',
+            TRACK_LINE_MODE: 'track_line_mode'
         };
 
         const colors = {
@@ -250,6 +253,12 @@
 
             context.clearRect(0, 0, canvas_size, canvas_size);
             init_canvas();
+        }
+
+        function track_line_mode() {
+            socket.send(JSON.stringify({
+                type: packet_types.TRACK_LINE_MODE,
+            }));
         }
 
         // Listen for messages

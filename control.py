@@ -3,6 +3,7 @@ from math import *
 import pypot.dynamixel
 from time import sleep, time
 import threading
+from vision import *
 
 
 #distance entre les deux roues en mètre
@@ -21,39 +22,52 @@ class NormalControl(AbstractControl):
 
         self.dxl_io = pypot.dynamixel.DxlIO(ports[0])
         self.dxl_io.set_wheel_mode([2, 5])
-        self.speed = 1
+        self.speed = 0.25
         self.start_background_odo()
         print("[+] Control initialized")
     
 
     def move(self, v_line, v_rot):
-        v_left = v_line - v_rot * wheels_distance / 2
+        """ v_left = v_line - v_rot * wheels_distance / 2
         v_right = v_line + v_rot * wheels_distance / 2
+        v_left = v_left*180/pi
+        v_right = v_right*180/pi
         self.dxl_io.set_moving_speed({2: v_left})
-        self.dxl_io.set_moving_speed({5: -v_right})
+        self.dxl_io.set_moving_speed({5: -v_right}) """
+        # Calculate wheel velocities in m/s
+        v_R = v_line + (v_rot * wheels_distance) / 2
+        v_L = v_line - (v_rot * wheels_distance) / 2
+        
+        # Convert wheel velocities to deg/s
+        v_R_deg = -v_R * (360 / (2 * pi * r))
+        v_L_deg = v_L * (360 / (2 * pi * r))
+
+        self.dxl_io.set_moving_speed({2: v_L_deg})
+        self.dxl_io.set_moving_speed({5: v_R_deg})
+
         
     def forward(self):
         """ self.dxl_io.set_moving_speed({2: 360 * self.speed})
         self.dxl_io.set_moving_speed({5: -360 * self.speed}) """
-        self.move(360*self.speed, 0)
+        self.move(self.speed, 0)
         print("[+] Control forward")
 
     def backward(self):
         """ self.dxl_io.set_moving_speed({2: -360*self.speed})
         self.dxl_io.set_moving_speed({5: 360*self.speed}) """
-        self.move(-360*self.speed, 0)
+        self.move((-self.speed), 0)
         print("[+] Control backward")
 
     def left(self):
         """ self.dxl_io.set_moving_speed({2: 180*self.speed})
         self.dxl_io.set_moving_speed({5: -360*self.speed}) """
-        self.move(180, 360*self.speed)
+        self.move(self.speed*0 ,2*self.speed)
         print("[+] Control left")
 
     def right(self):
         """ self.dxl_io.set_moving_speed({2: 360*self.speed})
         self.dxl_io.set_moving_speed({5: -180*self.speed}) """
-        self.move(180, -360*self.speed)
+        self.move(self.speed*0, -2*self.speed)
         print("[+] Dummy control right")
 
     def stop(self):
@@ -63,39 +77,58 @@ class NormalControl(AbstractControl):
     
     def set_speed(self, sp):
         self.speed = sp
-    
+
     def goto(self, x, y, w):
+        self.goto_thread = threading.Thread(target=self.background_goto, args=(x, y, w), daemon=True)
+        self.goto_thread.start()
+
+    
+    def background_goto(self, x, y, w):
         #compute the angle to turn
-        self._theta = atan2(sin(self._theta), cos(self._theta))
         theta_to_go = atan2(y-self._y, x-self._x)
         print("theta", theta_to_go)
         #compute the distance to travel
         distance = sqrt((x-self._x)**2 + (y-self._y)**2)
         print("distance", distance)
         #compute the angle to turn
-        angle = theta_to_go - self._theta
+        angle = (theta_to_go - self._theta) % pi
+        last_angle = inf
         print("angle", angle)
         #turn
-        while abs(angle) >= 0.0001:
-            if theta_to_go > self._theta:
-                self.move(0, -360 * self.speed)
-            else:
-                self.move(0, 360 * self.speed)
+        while abs(angle) >= 0.01 or last_angle < angle:
+            self._theta = atan2(sin(self._theta), cos(self._theta))
+            angle = theta_to_go - self._theta
+            angle = atan2(sin(angle), cos(angle))
+            last_angle = angle
+            self.move(0, -0.5 * angle + 0.2)
 
-            angle = theta_to_go - self._theta
-            print("error angle:",abs(angle))
+            print(f"error angle: {abs(angle):<5}",end="\r")
         #move
-        dist = 1
-        while dist >= 0.01:
-            if angle < 0:
-                self.move(100+ 500 * self.speed * dist, -720 * angle * self.speed)
-            else:
-                self.move(100+ 500 * self.speed * dist, 720 * angle * self.speed)
-            last_dist = dist
+        dist = inf
+        last_dist = inf
+        while  last_dist >= dist or dist >= 0.1:
+            self._theta = atan2(sin(self._theta), cos(self._theta))
+            theta_to_go = atan2(y-self._y, x-self._x)
             angle = theta_to_go - self._theta
+            angle = atan2(sin(angle), cos(angle))
+
+            self.move(0.1+self.speed * dist, -angle)
+            last_dist = dist
             dist = sqrt((x-self._x)**2 + (y-self._y)**2)
-            print(dist, last_dist)
-            print("error distance:", dist)
+            print(f"dist: {round(dist, 3):<5}, angle {round(angle,3):<5}", end="\r")
+        
+        angle = (w - self._theta) % pi
+        last_angle = inf
+        #turn
+        while abs(angle) >= 0.01 or last_angle < angle:
+            self._theta = atan2(sin(self._theta), cos(self._theta))
+            angle = w - self._theta
+            angle = atan2(sin(angle), cos(angle))
+            last_angle = angle
+            self.move(0, -0.5 * angle + 0.2)
+
+
+            print(f"error angle: {abs(angle):<5}",end="\r")
         #stop
         self.stop()
 
@@ -119,7 +152,7 @@ class NormalControl(AbstractControl):
         self._theta += theta*rdt
         self._x += v * rdt * cos(self._theta)
         self._y += v * rdt * sin(self._theta)
-        #print(f"V: {round(v,2):<5}, theta: {round(self._theta, 2):<5}")
+        #print(f"V: {round(v,2):<5}, x: {round(self._x, 2):<5}")
 
     def compute_odometry(self):
         return (self._x, self._y, self._theta)
@@ -135,9 +168,7 @@ class NormalControl(AbstractControl):
     #v_gauche et _droite sont en rad/s
     def direct_kinematics (self, v_left, v_right):
         v_robot = (v_left + v_right) / 2
-
         v = v_robot*r #en m/s
-
         omega = r * (v_left - v_right) / wheels_distance
         #print(f"v_left: {round(v_left, 2):<5}, v_right: {round(v_right, 2):<5}, tet: {round(self._theta, 2):<5}, v: {round(v, 2):<5}")
 
@@ -145,3 +176,20 @@ class NormalControl(AbstractControl):
 
     def reset_odometry(self):
         return super().reset_odometry()
+
+    def background_track(self):
+        old_calc = 0
+        curr_col = 0
+        while go:
+            image = capture()
+            percent = compute_black(image) if curr_col == 0 else compute(image)
+            self.move(self.speed*(1-abs(percent/100)), (-percent)/50)
+            print(curr_col)
+            print(percent, detect[curr_col], f"old : {old_calc}")
+            old_calc = percent
+            curr_col = swap(image, curr_col)
+    
+    def track_line(self):
+        self.track_thread = threading.Thread(target=self.background_track, daemon=True)
+        self.track_thread.start()
+        
