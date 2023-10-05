@@ -21,23 +21,26 @@ DEBUG = False
 go = True
 
 #Colors limits
-colors = {"black": [np.array([0, 0, 0]), np.array([180, 225, 80])]}
+colors = {"black": [np.array([0, 0, 0]), np.array([180, 225, 60])]}
 colors["green"] = [np.array([30, 50, 20]), np.array([65, 255, 255])]
 colors["orange"] = [np.array([0, 20, 10]), np.array([20, 255, 255])]
 
 #Witch color to detect
-d = 0
+curr_col = 0
 detect = ["black", "green"]
+old_calc = 0
 #Set swap color
 limit = "orange"
 stamp = [time.time(), False]
 
 #Cam init
-cam_port = 0
+cam_port = 2
 cam = cv2.VideoCapture(cam_port)
 #Cam resolution
-cam.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+y_max = 160
+x_max = 120
+cam.set(cv2.CAP_PROP_FRAME_WIDTH, y_max)
+cam.set(cv2.CAP_PROP_FRAME_HEIGHT, x_max)
 
 
 #Capture image & return image to work with
@@ -49,15 +52,15 @@ def capture():
 
 #Line detection
 def compute(img):
-    global go
+    global go, old_calc
 
     #remove imperfection with blur
     blur = cv2.GaussianBlur(img, (5, 5), cv2.BORDER_DEFAULT)
     #transform HSV
     hsv_img = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV)
     #set color range
-    lower_range = colors[detect[d]][0]
-    upper_range = colors[detect[d]][1]
+    lower_range = colors[detect[curr_col]][0]
+    upper_range = colors[detect[curr_col]][1]
     #masking
     mask = cv2.inRange(hsv_img, lower_range, upper_range)
     #generate mask's skeleton
@@ -65,20 +68,28 @@ def compute(img):
 
     #skeleton x,y mean
     Y, X = np.where(skeleton > 0)
-    xmoy = 120
-    ymoy = 160
-    if X != None and Y != None:
+    xmoy = x_max/2
+    ymoy = y_max/2
+    calc = old_calc
+    try:
         xmoy = int(np.mean(X))
         ymoy = int(np.mean(Y))
-    calc = (xmoy - 120) / 1.2
+        #normalize
+        calc = max(min(((xmoy - (x_max/2)) / (x_max/200)), 80.0), -80.0)
+    except:
+        pass
 
     #video debug
     if DEBUG :
-        # render = cv2.add(img, skeleton)
+        
         edged = cv2.Canny(mask, 30, 200)
         contours, hierarchy = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         cv2.drawContours(img, contours, -1, (0, 255, 255), 1)
-        cv2.drawMarker(img, (xmoy, ymoy), (0,0,255))
+        try:
+            cv2.drawMarker(img, (xmoy, ymoy), (0,0,255))
+        except:
+            pass
+
         cv2.imshow("rendering", img)
 
         if cv2.waitKey(1) == ord('q'):
@@ -111,7 +122,7 @@ def swap(img):
         #detect real mark or artefact
         Y,X = np.where(mask != 0)
         if len(Y) > 1500:
-            d = (d + 1) % 2 #change color
+            curr_col = (curr_col + 1) % 2 #change color
             stamp[1] = False #lock swap
             stamp[0] = t #remember last timestamp swap occured
 
@@ -120,6 +131,7 @@ if __name__ == "__main__":
     while go:
         image = capture()
         percent = compute(image)
-        print(percent, detect[d])
+        old_calc = percent
+        print(percent, detect[curr_col], f"old : {old_calc}")
         swap(image)
     cam.release()
