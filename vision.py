@@ -17,7 +17,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pypot
 
-DEBUG = False
+DEBUG = True
 go = True
 
 #Colors limits
