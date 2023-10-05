@@ -155,7 +155,7 @@ def compute_black(img):
 
 #swap line detection
 def swap(img, curr_col):
-    global go, stamp
+    global stamp
     t = time()
     #check if swap can be operated
     if stamp[1] or (t - stamp[0] >= 5.0):
@@ -176,8 +176,6 @@ def swap(img, curr_col):
             #curr_col = 1 #change color
             stamp[1] = False #lock swap
             stamp[0] = t #remember last timestamp swap occured
-            if curr_col == -1:
-                go = False
     return curr_col
 
 

@@ -178,9 +178,10 @@ class NormalControl(AbstractControl):
         return super().reset_odometry()
 
     def background_track(self):
+        track = True
         curr_col = 1 #1 = black; 0 = green; -1 = stop
         # old_calc = 0 #backup action
-        while go:
+        while track:
             image = capture()
             percent = compute_black(image) if curr_col == 1 else compute(image)
             self.move(self.speed*(1-abs(percent/100)), (-percent)/50)
@@ -188,6 +189,7 @@ class NormalControl(AbstractControl):
             # print(percent, detect[curr_col], f"old : {old_calc}")
             # old_calc = percent
             curr_col = swap(image, curr_col)
+            track = curr_col >= 0
         self.move(0, 0)
     
     def track_line(self):
