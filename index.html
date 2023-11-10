@@ -152,7 +152,6 @@
         }
 
         function handle_odometry_packet(message) {
-            console.log(message.data)
             const { x, y, theta } = message.data;
             const { centered_x, centered_y } = point_to_centered(x * 100, y * 100);
 
