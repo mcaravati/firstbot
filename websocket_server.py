@@ -14,7 +14,9 @@ class WebSocketServer(AbtractServer):
             'left': self._left,
             'right': self._right,
             'stop': self._stop,
-            'odometry': self._send_odometry
+            'odometry': self._send_odometry,
+            'goto': self._goto,
+            'set_speed': self._set_speed
         }
 
     async def _server_wrapper(self):
@@ -30,23 +32,24 @@ class WebSocketServer(AbtractServer):
     async def _message_handler(self, websocket):
         async for message in websocket:
             json_data = json.loads(message)
+            function_args = json_data['data'] if 'data' in json_data else None
 
             if json_data['type'] in self._function_map:
-                await self._function_map[json_data['type']](websocket)
+                await self._function_map[json_data['type']](websocket, function_args)
 
-    async def _forward(self, _):
+    async def _forward(self, websocket, args):
         return self._robot_control.forward()
 
-    async def _backward(self, _):
+    async def _backward(self, websocket, args):
         return self._robot_control.backward()
 
-    async def _left(self, _):
+    async def _left(self, websocket, args):
         return self._robot_control.left()
 
-    async def _right(self, _):
+    async def _right(self, websocket, args):
         return self._robot_control.right()
 
-    async def _stop(self, _):
+    async def _stop(self, websocket, args):
         return self._robot_control.stop()
 
     async def _send_odometry(self, websocket):
@@ -63,3 +66,7 @@ class WebSocketServer(AbtractServer):
         }
 
         await websocket.send(json.dumps(response))
+
+    async def _goto(self, websocket, args):
+        return self._robot_control.goto(args['x'], args['y'], args['theta'])
+        
